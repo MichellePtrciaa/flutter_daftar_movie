@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_daftar_movie/models/movie.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -15,11 +18,67 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   bool _isFavorite = false; // State sederhana untuk favorites
+  initState() {
+    super.initState();
+    _checkIsFavorite(); // Cek apakah film ini sudah di-favorite
+  }
+
+  Future<void> _checkIsFavorite() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isFavorite = prefs.containsKey('movie_${widget.movie.id}');
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isFavorite = !_isFavorite;
+    });
+
+    if (_isFavorite) {
+      final String movieJson = jsonEncode(widget.movie.toJson());
+      prefs.setString('movie_${widget.movie.id}', movieJson);
+
+      List<String> favoriteMovieIds =
+          prefs.getStringList('favoriteMovies') ?? [];
+      if (!favoriteMovieIds.contains(widget.movie.id.toString())) {
+        favoriteMovieIds.add(widget.movie.id.toString());
+        prefs.setStringList('favoriteMovies', favoriteMovieIds);
+      }
+    } else {
+      prefs.remove('movie_${widget.movie.id}');
+      List<String> favoriteMovieIds =
+          prefs.getStringList('favoriteMovies') ?? [];
+      favoriteMovieIds.remove(widget.movie.id.toString());
+      prefs.setStringList('favoriteMovies', favoriteMovieIds);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: 120, // perlu ruang lebih untuk dua icon
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.favorite),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const FavoriteScreen()),
+                );
+              },
+              tooltip: 'Favorite',
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+              tooltip: 'Back',
+            ),
+          ],
+        ),
         title: Text(
           widget.movie.title,
           style: GoogleFonts.poppins(
@@ -30,18 +89,8 @@ class _DetailScreenState extends State<DetailScreen> {
         ),
         backgroundColor: Colors.black, // Tema gelap mirip Netflix
         actions: [
-          IconButton(
-            icon: Icon(
-              _isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              setState(() {
-                _isFavorite = !_isFavorite;
-              });
-              // Tambahkan logika untuk menyimpan favorites jika diperlukan
-            },
-          ),
+          // bisa dihapus atau biarkan kosong jika gak perlu lagi,
+          // karena ikon favorit sudah di kiri.
         ],
       ),
       backgroundColor: Colors.black, // Background gelap mirip Netflix
@@ -105,17 +154,16 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                       ),
                       // Overlay gradient untuk efek fade dan keren
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.7),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
+                      Container(
+                        height: 200,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
                           ),
                         ),
                       ),
